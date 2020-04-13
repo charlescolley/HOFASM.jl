@@ -1,0 +1,5 @@
+module HOFASM
+
+greet() = print("Hello World!")
+
+end # module
