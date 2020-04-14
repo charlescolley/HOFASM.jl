@@ -301,6 +301,8 @@ function HOM_graduated_assignment(marg_tensor::SparseMatrixCSC{Float64,Int64},ma
 
 end
 
+
+#=
 #TODO: could generalize to take a contraction function to unify all graduated assignment routines
 function HOM_graduated_assignment(A::ssten.COOTen,max_iterations::Int=12,tol::Float64=1e-4)
 
@@ -353,3 +355,4 @@ function HOM_graduated_assignment(A::ssten.COOTen,max_iterations::Int=12,tol::Fl
     end
 
 end
+=#
