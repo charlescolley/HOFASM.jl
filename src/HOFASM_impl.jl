@@ -1,6 +1,56 @@
+#=-----------------------------------------------------------------------------
+   Contains the bulk of the subroutines For the HOFASM algorithm
 
-function synthetic_problem_orig(n::Int,sigma::Float64)
+   functions included are
+   * synthetic_HOFASM
+   * compute_angle_align_score
+   * build_list_of_approx_tensor
+   * build_angle_difference_tensors
+   * build_index_and_bases_tensors
+   * Make_HOFASM_tensor_pairs
 
+-----------------------------------------------------------------------------=#
+
+
+
+"""-----------------------------------------------------------------------------
+    Runs a full synthetic correspondence problem alignment random points to
+  perturbed points with std dev σ. Algorithm can be run with 3 different modes,
+  which determine how the contractions are computed at each iteration of the
+  graduated assignment routine, using the original specifications, or our sped
+  up routines which utilize the kronecker mixed product property.
+
+  Inputs:
+  -------
+  * n - (Int):
+    The number of points to use in the correspondence problem
+  * sigma - (Float64):
+    The standard deviation of the pertubation applied to the source points
+  * method - (optional String):
+    a string indicating which method to use in the contraction phase of the
+    algorithm.
+    options:
+        * - "new": Uses our new methods which use the mixed product property
+                   to improve the runtime. This is the default option.
+        * - "orig": Uses a list of explicitly built marginalized tensors
+                    corresponding to each Hn ⊗ Bn pair
+        * - "orig2": Uses the original list of tensor indices, and implicitly
+                     marginalizes at each contraction phase.
+
+  Outputs:
+  --------
+  * X - (Array{Float64,2}):
+    The final assignment matrix from the graduated assignment iterations.
+  * kron_time -(Float64):
+    The time it takes to compute the pairs of marginalized tensors, returns 0.0
+    when this step is unused.
+  * iteration_time - (Float64):
+    The run time of the graduated assignment step.
+-----------------------------------------------------------------------------"""
+function synthetic_HOFASM(n::Int,sigma::Float64;method="new")
+
+    println("test")
+    m = n
     source_points = randn(Float64,n,2)
     target_points = Array{Float64,2}(undef,n,2)
     for i =1:n
@@ -11,111 +61,52 @@ function synthetic_problem_orig(n::Int,sigma::Float64)
     source_triangles = brute_force_triangles(source_points)
     target_triangles = brute_force_triangles(target_points)
 
-#    return source_triangles, target_triangles
-
     index_tensor_indices, index_tensor_vals , bases_tensor_indices, bases_tensor_vals =
         build_index_and_bases_tensors(source_triangles, target_triangles, 5.0)
 
-#    return index_tensor_indices, index_tensor_vals , bases_tensor_indices, bases_tensor_vals
-    n = maximum([maximum(x) for x in index_tensor_indices])
-    m = maximum([maximum(x) for x in bases_tensor_indices])
+#    n = maximum([maximum(x) for x in index_tensor_indices if length(x) != 0])
+#    m = maximum([maximum(x) for x in bases_tensor_indices if length(x) != 0])
 
-    marginalized_tensors,kron_time =
-      @timed [implicit_kronecker_mode1_marginalization(Bn_ind,Bn_val,Hn_ind,n,m) for (Bn_ind,Bn_val,Hn_ind)
+    if method == "new"
+        marg_ten_pairs, kron_time =
+            @timed Make_HOFASM_tensor_pairs(index_tensor_indices,bases_tensor_indices,
+                                            bases_tensor_vals,n,n)
+
+        x, iteration_time = @timed HOFASM_iterations(marg_ten_pairs,n,m)
+    elseif method == "orig"
+        marginalized_tensors,kron_time =
+          @timed [implicit_kronecker_mode1_marginalization(Bn_ind,Bn_val,Hn_ind,n,m) for (Bn_ind,Bn_val,Hn_ind)
         in zip(bases_tensor_indices,bases_tensor_vals,index_tensor_indices)]
 
-    x, iteration_time = @timed HOFASM_iterations(marginalized_tensors,n,m)
+        x, iteration_time = @timed HOFASM_iterations(marginalized_tensors,n,m)
 
+    elseif method =="orig2"
+        kron_time = 0.0
+        x, iteration_time = @timed HOFASM_iterations(bases_tensor_indices,
+                                                     bases_tensor_vals,index_tensor_indices,n,m)
+    else
+        throw(ArgumentError("valid method: must be 'new', 'orig', or 'orig2'"))
+    end
     #transpose is needed because reshape is colmajor formatted
     return Array(reshape(x,m,n)'), kron_time, iteration_time
 
 end
 
-function synthetic_problem_orig2(n::Int,sigma::Float64)
 
-    source_points = randn(Float64,n,2)
-    target_points = Array{Float64,2}(undef,n,2)
-    for i =1:n
-        target_points[i,:] = source_points[i,:] + randn(2)*sigma
-    end
-
-    #find all the triangles in between the points
-    source_triangles = brute_force_triangles(source_points)
-    target_triangles = brute_force_triangles(target_points)
-
-#    return source_triangles, target_triangles
-
-    index_tensor_indices, index_tensor_vals , bases_tensor_indices, bases_tensor_vals =
-        build_index_and_bases_tensors(source_triangles, target_triangles, 5.0)
-
-#    return index_tensor_indices, index_tensor_vals , bases_tensor_indices, bases_tensor_vals
-    n = maximum([maximum(x) for x in index_tensor_indices])
-    m = maximum([maximum(x) for x in bases_tensor_indices])
-
-#    marginalized_tensors,kron_time =
-#      @timed [implicit_kronecker_mode1_marginalization(Bn_ind,Bn_val,Hn_ind,n,m) for (Bn_ind,Bn_val,Hn_ind)
-#        in zip(bases_tensor_indices,bases_tensor_vals,index_tensor_indices)]
-
-    x, iteration_time = @timed HOFASM_iterations(bases_tensor_indices, bases_tensor_vals,index_tensor_indices,n,m)
-
-    #transpose is needed because reshape is colmajor formatted
-    return Array(reshape(x,m,n)'), iteration_time
-
-end
-
-function synthetic_problem_new(n::Int,sigma::Float64,outliers::Int=0,scaling::Float64=1.0)#,source_points,target_points)
-
-    source_points = randn(Float64,n+outliers,2)
-    target_points = Array{Float64,2}(undef,n+outliers,2)
-    for i::Int =1:n
-        target_points[i,:] = source_points[i,:] + randn(2)*sigma
-        target_points[i,:] *= scaling
-    end
-
-    for i::Int=1:outliers
-        target_points[n+i,:] = randn(2)
-        source_points[n+i,:] = randn(2)
-    end
-
-    #find all the triangles in between the points
-    source_triangles = brute_force_triangles(source_points)
-    target_triangles = brute_force_triangles(target_points)
-
-#    return source_triangles, target_triangles
-
-    bin_size = 5.0
-    index_tensor_indices, index_tensor_vals , bases_tensor_indices, bases_tensor_vals =
-        build_index_and_bases_tensors(source_triangles, target_triangles, bin_size)
-
-
-#    return index_tensor_indices, index_tensor_vals , bases_tensor_indices, bases_tensor_vals
-    n = maximum([maximum(x) for x in index_tensor_indices])
-    m = maximum([maximum(x) for x in bases_tensor_indices])
-
-    #marg_Hn_tens, marg_Hn_time =
-    #  @timed [sym_mode1_marginalization(H_ind,H_vals,n) for (H_ind,H_vals) in zip(index_tensor_indices, index_tensor_vals)]
-    #marg_Bn_tens, marg_Bn_time =
-    #  @timed [mode1_marginalization(B_ind,B_vals,m) for (B_ind,B_vals) in zip(bases_tensor_indices, bases_tensor_vals)]
-
-    marg_ten_pairs, marg_time =@timed Make_HOFASM_tensor_pairs(index_tensor_indices,bases_tensor_indices,bases_tensor_vals,n,n)
-    #x, iteration_time = @timed HOFASM_iterations(marg_Hn_tens,marg_Bn_tens,n,m)
-    x, iteration_time = @timed HOFASM_iterations(marg_ten_pairs,n,m)
-    #transpose is needed because reshape is colmajor formatted
-    return Array(reshape(x,m,n)'), marg_time , iteration_time
-
-end
-
-function compute_angle_align_score(angles1::Tuple{F,F,F}, angles2::Tuple{F,F,F}, sigma::F) where {F <: AbstractFloat}
+function compute_angle_align_score(angles1::Tuple{F,F,F}, angles2::Tuple{F,F,F}, sigma::F;testing_mode=false) where {F <: AbstractFloat}
     a1,a2,a3 = angles1
     ap1,ap2,ap3 = angles2
     #TODO: make this an option for special testing
-    #return ((a1 - ap1)^2+(a2 - ap2)^2+(a3 - ap3)^2) / sigma^2
-    return 4.5 - ((a1 - ap1)^2+(a2 - ap2)^2+(a3 - ap3)^2) / (6 * sigma^2)
+    if testing_mode
+        return ((a1 - ap1)^2+(a2 - ap2)^2+(a3 - ap3)^2) / sigma^2
+    else
+        return 4.5 - ((a1 - ap1)^2+(a2 - ap2)^2+(a3 - ap3)^2) / (6 * sigma^2)
+    end
 end
 
 
 function build_list_of_approx_tensors(triangles::Array{Tuple{Tuple{Int,Int,Int},Tuple{F,F,F}},1},
-    eps::F=1.0;avg_bins=false) where {F <: AbstractFloat}
+    eps::F=1.0;avg_bins=false,test_mode=false) where {F <: AbstractFloat}
     """-------------------------------------------------------------------------
         Builds a dictionary linking approximate angles to that each triangle
       closest maps to and returns a list of pairs containing the indices and the
@@ -147,17 +138,15 @@ function build_list_of_approx_tensors(triangles::Array{Tuple{Tuple{Int,Int,Int},
         bin_averages = Dict{Array{F,1},Array{F,1}}()
     end
 
-    #TODO: must fix this
- #   for (idx,ang) in
+
+
     for (indices,angles) in triangles
- #                        zip(permutations(idx),permutations(ang))
 
         aprox_angle1 = eps * (floor(angles[1] / eps) + .5)
         aprox_angle2 = eps * (floor(angles[2] / eps) + .5)
         aprox_angle3 = 180 - aprox_angle1 - aprox_angle2
         approx_angles = [aprox_angle1,aprox_angle2,aprox_angle3]
 
-   #     perm = [1, 2, 3]
         perm = sortperm(approx_angles)
         sort!(approx_angles)
         indices = tuple(indices[perm[1]],indices[perm[2]],indices[perm[3]])
@@ -176,7 +165,6 @@ function build_list_of_approx_tensors(triangles::Array{Tuple{Tuple{Int,Int,Int},
             Tensors[approx_angles] = [indices]
         end
     end
- #   end
 
     if avg_bins
 
@@ -195,7 +183,7 @@ end
 # list of unique approximate angles and a list of indices matching to angles
 function build_angle_difference_tensors(approx_angles::Array{F,2},
     triangles::Array{Tuple{Tuple{Int,Int,Int},Tuple{F,F,F}},1},
-    sigma::F = 1.0) where {F <: AbstractFloat}
+    sigma::F = 1.0;test_mode=false) where {F <: AbstractFloat}
     """-------------------------------------------------------------------------
         Computes a linking the approximate angles to a dictionary
     Inputs:
@@ -210,6 +198,7 @@ function build_angle_difference_tensors(approx_angles::Array{F,2},
       * sigma - (float)
         The angle tolerance threshold between whether or not to include the
         comparison between triangle, angles.
+      * test_mode - (optional Bool)
     Outputs:
     --------
       * associated_tensors - (List of (3-tuple, Dict 3-tuple -> float) pairs):
@@ -232,9 +221,16 @@ function build_angle_difference_tensors(approx_angles::Array{F,2},
                 index_perm = tuple(indices[i],indices[j],indices[k])
                 angle_perm = tuple(image_angles[i],image_angles[j],image_angles[k])
 
-                if all([abs(a1 - a2) < 3 * sigma for (a1, a2) in zip(angle_perm, approx_angle)])
+                if test_mode
                     push!(tensor_hyperedges,
-                          tuple(index_perm,compute_angle_align_score(angle_perm , compute_angle, sigma)))
+                          tuple(index_perm,compute_angle_align_score(angle_perm , compute_angle,
+                                                                     sigma,
+                                                                     testing_mode=test_mode)))
+                else
+                    if all([abs(a1 - a2) < 3 * sigma for (a1, a2) in zip(angle_perm, approx_angle)])
+                        push!(tensor_hyperedges,
+                              tuple(index_perm,compute_angle_align_score(angle_perm , compute_angle, sigma)))
+                    end
                 end
             end
         end
@@ -244,11 +240,7 @@ function build_angle_difference_tensors(approx_angles::Array{F,2},
 
     return associated_tensors
 end
-
-function build_index_and_bases_tensors(image1_triangles::Array{Tuple{Tuple{Int,Int,Int},Tuple{F,F,F}},1},
-    image2_triangles::Array{Tuple{Tuple{Int,Int,Int},Tuple{F,F,F}},1},
-    angle_bin_size::F) where {F <: AbstractFloat}
-    """-------------------------------------------------------------------------
+"""----------------------------------------------------------------------------
         From the provided triangle dictionaries provided, produces the lists of
       hyper edges in the base tensors Bn, and the index tensors Hn. Index
       tensors are produced by finding the approximate center angles determined
@@ -265,7 +257,13 @@ function build_index_and_bases_tensors(image1_triangles::Array{Tuple{Tuple{Int,I
       their triangle.
     * angle_bin_size - (Float):
       The bin size to approximate the angles with.
-
+    * avg_bins -(optional bool):
+      Indicates whether or not to replace the midpoint of each approximate
+      angle with the average of the angles in each bin.
+    * test_mode - (optional bool):
+      Indicates whether to change the settings needed for a test mode which
+      compares whether or not the HOFASM matrices can be equal to the HOM
+      matrices.
     TODO: Update Outputs
     Outputs:
     --------
@@ -276,13 +274,24 @@ function build_index_and_bases_tensors(image1_triangles::Array{Tuple{Tuple{Int,I
     * index_tensors - (List of (3-tuple, Dict of 3-tuples -> float) pairs):
       List of approximate angles paired with index tensors storing the indices
       of triangles in image1 associated with that approximated triangle.
-    -------------------------------------------------------------------------"""
+ ----------------------------------------------------------------------------"""
+function build_index_and_bases_tensors(image1_triangles::Array{Tuple{Tuple{Int,Int,Int},Tuple{F,F,F}},1},
+    image2_triangles::Array{Tuple{Tuple{Int,Int,Int},Tuple{F,F,F}},1},
+    angle_bin_size::F,avg_bins=false;test_mode=false) where {F <: AbstractFloat}
+
     #TODO: add avg_bins as arg for for testing
+    if test_mode
+        angle_bin_size=1e-16 #each angle gets their own bin
+        avg_bins = true
+    end
     approx_tensors =
-        build_list_of_approx_tensors(image1_triangles, angle_bin_size,avg_bins=false) #changed
+        build_list_of_approx_tensors(image1_triangles, angle_bin_size,
+                                     avg_bins = avg_bins,
+                                     test_mode=test_mode)
     approx_triangles =
       Matrix(reshape(collect(Iterators.flatten(keys(approx_tensors))),(3,length(approx_tensors)))')
-    bases_tensors = build_angle_difference_tensors(approx_triangles,image2_triangles)
+    bases_tensors = build_angle_difference_tensors(approx_triangles,image2_triangles,
+                                                   test_mode=test_mode)
 
     #build lists of indices and non-zeros values in order of sorted approximate angles
 
@@ -293,8 +302,10 @@ function build_index_and_bases_tensors(image1_triangles::Array{Tuple{Tuple{Int,I
     bases_tensor_vals = Array{Array{F,1},1}(undef,length(approx_tensors))
     index = 1
 
-    index_tensors_pairings::Array{Tuple{Array{Float64,1},Array{Tuple{Int64,Int64,Int64},1}},1} = sort([(k,v) for (k,v) in approx_tensors], by =x->x[1])
-    bases_tensors_pairings::Array{Tuple{Tuple{Float64,Float64,Float64},Array{Tuple{Tuple{Int64,Int64,Int64},Float64},1}},1} = sort([(k,v) for (k,v) in bases_tensors], by =x->x[1])
+    index_tensors_pairings::Array{Tuple{Array{Float64,1},Array{Tuple{Int64,Int64,Int64},1}},1} =
+        sort([(k,v) for (k,v) in approx_tensors], by =x->x[1])
+    bases_tensors_pairings::Array{Tuple{Tuple{Float64,Float64,Float64},Array{Tuple{Tuple{Int64,Int64,Int64},Float64},1}},1}=
+        sort([(k,v) for (k,v) in bases_tensors],  by =x->x[1])
 
     for ((H_approx_angle,H_indices),(B_approx_angle,edges)) in zip(index_tensors_pairings,bases_tensors_pairings)
 
@@ -342,16 +353,6 @@ function build_index_and_bases_tensors(image1_triangles::Array{Tuple{Tuple{Int,I
     return index_tensor_indices[1:(index-1)], index_tensor_vals[1:(index-1)] , bases_tensor_indices[1:(index-1)], bases_tensor_vals[1:(index-1)]
 end
 
-function HOFASM_mode1_marg(H_indices::Array{Array{Int64,2},1},B_indices::Array{Array{Int64,2},1},
-                            B_vals::Array{Array{Float64,1},1},m::Int,n::Int)
-
-        return sum([sum(
-                [numpy_kron(perm_mode1_marginalization(H_idx,ones(size(H_idx,1)),p,n),
-                            perm_mode1_marginalization(B_idx,v,p,m)
-                            )
-                            for p in permutations((1,2,3))
-                ]) for (H_idx,B_idx,v) in zip(H_indices,B_indices,B_vals)])
-end
 
 function Make_HOFASM_tensor_pairs(H_indices::Array{Array{Int64,2},1},B_indices::Array{Array{Int64,2},1},
                             B_vals::Array{Array{Float64,1},1},m::Int,n::Int)
