@@ -95,7 +95,7 @@ function implicit_kronecker_mode1_marginalization(Bn_indices::Array{Int,2},
     #return ei,ej,vals,n*m
 end
 =#
-#= TODO: verify this can be retired
+
 function sym_mode1_marginalization(indices::Array{Int,2},vals::Array{Float64,1},m::Int)
     n,d = size(indices)
 
@@ -140,7 +140,7 @@ function sym_mode1_marginalization(indices::Array{Int,2},vals::Array{Float64,1},
 
     return sparse(ei,ej,new_vals,m,m)
 end
-=#
+
 function mode1_marginalization(indices::Array{Int,2},vals::Array{Float64,1},m::Int)
     n,d = size(indices)
 
@@ -328,8 +328,8 @@ function perm_mode1_marginalization(indices::Array{Int,2},vals::Array{Float64,1}
         index += 1
 
     end
-
-    return sparse(ei,ej,new_vals,m,m)::SparseMatrixCSC{Float64,Int64}
+    index -= 1 #counter the last extra index
+    return sparse(ei[1:index],ej[1:index],new_vals[1:index],m,m)::SparseMatrixCSC{Float64,Int64}
 end
 
 """----------------------------------------------------------------------------

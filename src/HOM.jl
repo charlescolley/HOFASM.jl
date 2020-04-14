@@ -1,12 +1,21 @@
 
-function synthetic_HOM(n::Int,sigma::Float64)
+function synthetic_HOM(n::Int,sigma::Float64,outliers::Int=0,scale::Float64=1.0)
 
     d = 2
-    source_points = randn(Float64,n,d)
-    target_points = Array{Float64,2}(undef,n,d)
-    for i =1:n
-        target_points[i,:] = source_points[i,:] + randn(d)*sigma
+    source_points = randn(Float64,n+outliers,d)
+    target_points = Array{Float64,2}(undef,n+outliers,d)
+    for i::Int =1:n
+        target_points[i,:] = source_points[i,:] + randn(2)*sigma
+        target_points[i,:] *= scale
     end
+
+    for i::Int=1:outliers
+        target_points[n+i,:] = randn(2)
+        source_points[n+i,:] = randn(2)
+    end
+
+    n += outliers
+    m = n
 
     #shuffle the target points
     p = shuffle(1:n)
@@ -16,11 +25,7 @@ function synthetic_HOM(n::Int,sigma::Float64)
     source_triangles = brute_force_triangles(source_points)
     target_triangles = brute_force_triangles(target_points)
 
-#    return source_triangles, target_triangles
-
     indices, vals = produce_HOM_tensor(source_triangles,target_triangles,n,tol=1e-12)
-
-#    return indices, vals
 
     marginalized_tensor = sym_mode1_marginalization(indices,vals,n^2)
     #marg_result = reshape(HOM_graduated_assignment(marginalized_tensor),n,n)

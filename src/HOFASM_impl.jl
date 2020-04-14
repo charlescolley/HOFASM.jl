@@ -47,14 +47,22 @@
   * iteration_time - (Float64):
     The run time of the graduated assignment step.
 -----------------------------------------------------------------------------"""
-function synthetic_HOFASM(n::Int,sigma::Float64;method="new")
+function synthetic_HOFASM(n::Int,sigma::Float64,outliers::Int=0,scale::Float64=1.0;method="new")
 
-    m = n
-    source_points = randn(Float64,n,2)
-    target_points = Array{Float64,2}(undef,n,2)
-    for i =1:n
+    source_points = randn(Float64,n+outliers,2)
+    target_points = Array{Float64,2}(undef,n+outliers,2)
+    for i::Int =1:n
         target_points[i,:] = source_points[i,:] + randn(2)*sigma
+        target_points[i,:] *= scale
     end
+
+    for i::Int=1:outliers
+        target_points[n+i,:] = randn(2)
+        source_points[n+i,:] = randn(2)
+    end
+
+    n += outliers
+    m = n
 
     #shuffle the target points
     p = shuffle(1:n)
@@ -73,7 +81,7 @@ function synthetic_HOFASM(n::Int,sigma::Float64;method="new")
     if method == "new"
         marg_ten_pairs, kron_time =
             @timed Make_HOFASM_tensor_pairs(index_tensor_indices,bases_tensor_indices,
-                                            bases_tensor_vals,n,n)
+                                            bases_tensor_vals,n,m)
 
         x, iteration_time = @timed HOFASM_iterations(marg_ten_pairs,n,m)
     elseif method == "orig"
@@ -90,8 +98,8 @@ function synthetic_HOFASM(n::Int,sigma::Float64;method="new")
     else
         throw(ArgumentError("valid method: must be 'new', 'orig', or 'orig2'"))
     end
-    #transpose is needed because reshape is colmajor formatted
-    return Array(reshape(x,m,n)'), kron_time, iteration_time, p
+
+    return reshape(x,n,m), kron_time, iteration_time, p
 
 end
 
@@ -358,7 +366,7 @@ end
 
 
 function Make_HOFASM_tensor_pairs(H_indices::Array{Array{Int64,2},1},B_indices::Array{Array{Int64,2},1},
-                            B_vals::Array{Array{Float64,1},1},m::Int,n::Int)
+                            B_vals::Array{Array{Float64,1},1},n::Int,m::Int)
     marginalized_ten_pairs = Array{Tuple{SparseMatrixCSC{Float64,Int64},SparseMatrixCSC{Float64,Int64}},1}(undef,0)
     for (H_idx,B_idx,v) in zip(H_indices,B_indices,B_vals)
         for p in permutations((1,2,3))

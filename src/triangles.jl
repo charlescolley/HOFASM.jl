@@ -1,5 +1,6 @@
 function angle(vec1::Array{F,1},vec2::Array{F,1}) where {F <: AbstractFloat}
     acos(dot(vec1, vec2) / (norm(vec1) * norm(vec2))) * 180 / pi
+    #TODO: fix DomainError with 1.0000000000000002 problem
 end
 
 function vecs_to_triangle(veci::Array{F,1},vecj::Array{F,1},veck::Array{F,1}) where {F <: AbstractFloat}

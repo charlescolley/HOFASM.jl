@@ -14,6 +14,7 @@ function timing_experiments(;method="HOFASM",sub_method="new")
             if method == "HOFASM"
                 _ , kt, rt, _ = synthetic_HOFASM(n,sigma,method=sub_method)
             elseif method == "HOM"
+                kt = 0.0
                 _, rt, _ = synthetic_HOM(n,sigma)
             end
 
@@ -38,9 +39,6 @@ function accuracy_experiments(average_over::Int = 2;method="HOFASM",sub_method="
 
     sigmas = [.025,.05,.0725,.1,.125,.15,.175,.2]
 
- #   kron_formation_times = []
-    argsort_accuracies = []
-    argsort_variances = []
     colsort_accuracies = []
     colsort_variances = []
 
@@ -55,7 +53,7 @@ function accuracy_experiments(average_over::Int = 2;method="HOFASM",sub_method="
 
         for i in 1:average_over
             if method == "HOFASM"
-                X , _, _, p  = synthetic_HOFASM(n,sigma,sub_method)
+                X , _, _, p  = synthetic_HOFASM(n,sigma,method=sub_method)
             elseif method == "HOM"
                 X,_, p  = synthetic_HOM(n,sigma)
             end
@@ -74,95 +72,80 @@ function accuracy_experiments(average_over::Int = 2;method="HOFASM",sub_method="
     return colsort_variances, colsort_accuracies
 end
 
-function outlier_experiments(average_over::Int = 2)
+function outlier_experiments(average_over::Int = 2;method="HOFASM")
 
     sigma = .1
     max_outliers = 20
 
- #   kron_formation_times = []
-    argsort_accuracies = []
-    argsort_variances = []
     colsort_accuracies = []
     colsort_variances = []
 
     n = 20
 
-
-    for outliers = 0:max_outliers
+    for outliers = 0:2:max_outliers
 
 #        kron_time = 0.0
         test_argsort_accuracies = []
         test_colsort_accuracies = []
 
         for i in 1:average_over
-            X , _ = synthetic_problem_new(n,sigma,outliers)
+            if method =="HOM"
+                X , _, p = synthetic_HOM(n,sigma,outliers)
+            else
+                X , _, _, p = synthetic_HOFASM(n,sigma,outliers)
+            end
 
-            argsort_accuracy = sum([1.0 for (i,j) in build_assignment(X) if i == j])/n
-            colsort_accuracy = sum([1.0 for (i,j) in build_assignment(X,use_colsort=true) if i == j])/n
+            assignment = build_assignment(X,use_colsort=true)
+            colsort_accuracy = sum([1.0 for (i,j) in assignment if p[i] == j])/(n+outliers)
 
-            push!(test_argsort_accuracies,argsort_accuracy)
             push!(test_colsort_accuracies,colsort_accuracy)
         end
 
-
-
-        push!(argsort_variances,var(test_argsort_accuracies))
-        push!(argsort_accuracies,sum(test_argsort_accuracies)/average_over)
 
         push!(colsort_variances,var(test_colsort_accuracies))
         push!(colsort_accuracies,sum(test_colsort_accuracies)/average_over)
     end
 
-#    kron_formation_times,
-    return argsort_variances, argsort_accuracies, colsort_variances, colsort_accuracies
+    return colsort_variances, colsort_accuracies
 end
 
-function scaling_experiments(average_over::Int = 2;display=false)
+function scaling_experiments(average_over::Int = 2; method ="HOFASM")
 
     sigma = .05
     outliers = 5
     scalings = range(1,stop=3,length=10)
 
- #   kron_formation_times = []
-    argsort_accuracies = []
-    argsort_variances = []
     colsort_accuracies = []
     colsort_variances = []
 
     n = 20
 
-
     for scale in scalings
 
-#        kron_time = 0.0
-        test_argsort_accuracies = []
         test_colsort_accuracies = []
 
         for i in 1:average_over
-            X , _, _ ,source, target = synthetic_problem_new(n,sigma,outliers,scale)
 
-            argsort_accuracy = sum([1.0 for (i,j) in build_assignment(X) if i == j])/n
-            colsort_accuracy = sum([1.0 for (i,j) in build_assignment(X,use_colsort=true) if i == j])/n
-
-            if display
-                display_synthetic_result(source,target,n,build_assignment(X,use_colsort=true))
+            if method =="HOM"
+                X , _, p = synthetic_HOM(n,sigma,outliers,scale)
+            else
+                X , _, _, p = synthetic_HOFASM(n,sigma,outliers,scale)
             end
 
-            push!(test_argsort_accuracies,argsort_accuracy)
+            assignment = build_assignment(X,use_colsort=true)
+            colsort_accuracy = sum([1.0 for (i,j) in assignment if p[i] == j])/(n+outliers)
+
             push!(test_colsort_accuracies,colsort_accuracy)
+
         end
 
-
-
-        push!(argsort_variances,var(test_argsort_accuracies))
-        push!(argsort_accuracies,sum(test_argsort_accuracies)/average_over)
 
         push!(colsort_variances,var(test_colsort_accuracies))
         push!(colsort_accuracies,sum(test_colsort_accuracies)/average_over)
     end
 
-#    kron_formation_times,
-    return argsort_variances, argsort_accuracies, colsort_variances, colsort_accuracies
+
+    return colsort_variances, colsort_accuracies
 end
 
 
