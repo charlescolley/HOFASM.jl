@@ -190,7 +190,7 @@ function HOFASM_iterations(tensor_pairs::Array{NTuple{2,SparseMatrixCSC{Float64,
     X_k_1 = Array{Float64,2}(undef,n,m)
     i = 1
 
-    preprocessed_pairs = [(findnz(H)[1],findnz(H)[2],B) for (H,B) in tensor_pairs]
+    preprocessed_pairs = [(findnz(H)...,B) for (H,B) in tensor_pairs]
 
     while true
 
