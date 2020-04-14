@@ -227,6 +227,21 @@ function HOFASM_contraction!(tensor_pairs::Array{Tuple{Array{Int,1},Array{Int,1}
 
 end
 
+"""----------------------------------------------------------------------------
+----------------------------------------------------------------------------"""
+function HOFASM_contraction!(marginalized_tensors::Array{SparseMatrixCSC{Float64,Int64},1},
+                             x_k::Array{Float64,1},x_k_1::Array{Float64,1})
+
+
+    for i=1:length(x_k_1)
+       x_k_1[i] = 0.0
+    end
+
+    for Tn in marginalized_tensors
+        x_k_1 .+= Tn*x_k
+    end
+
+end
 
 
 #TODO: need to correct the output
@@ -317,32 +332,38 @@ function perm_mode1_marginalization(indices::Array{Int,2},vals::Array{Float64,1}
     return sparse(ei,ej,new_vals,m,m)::SparseMatrixCSC{Float64,Int64}
 end
 
-function perm_marginalize(H_index,B_indices::Array{Int64,2},B_vals::Array{Float64,1},m::Int)
+"""----------------------------------------------------------------------------
+    Computes the marginalization of ∑ Hn^{<σ>} ⨂ Bn^{<σ>} from the indices of
+  their tensor representations.
+----------------------------------------------------------------------------"""
+function perm_marginalize(H_indices::Array{Int64,2},B_indices::Array{Int64,2},
+                          B_vals::Array{Float64,1},n::Int,m::Int)
 
-    z = size(B_indices,1)
-    ei = zeros(Int,z*6)
-    ej = zeros(Int,z*6)
-    vals = zeros(Float64,z*6)
+    B_nnz = size(B_indices,1)
+    H_nnz = size(H_indices,1)
+
+    ei = zeros(Int,B_nnz*H_nnz*6)
+    ej = zeros(Int,B_nnz*H_nnz*6)
+    vals = zeros(Float64,B_nnz*H_nnz*6)
     index = 1
 
-    for p in permutations([1,2,3])
+    for i in 1:H_nnz
+        for p in permutations([1,2,3])
 
-        i1,i2,i3 = H_index[p]
+            i1,i2,i3 = H_indices[i,p]
 
-        for (k,val) in zip(1:z,B_vals)
+            for j in 1:B_nnz
 
-            println(B_indices[k,:])
-            println("H_indices: $i1, $i2, $i3")
+                (_,j2,j3) = B_indices[j,p]
+                ei[index] = (i2-1)*m + j2
+                ej[index] = (i3-1)*m + j3
+                vals[index] = B_vals[j]
+                index += 1
 
-            (_,j2,j3) = B_indices[k,p]
-            ei[index] = (i2-1)*m + j2
-            ej[index] = (i3-1)*m + j3
-            vals[index] = val
-            index += 1
-
+            end
         end
     end
 
-    return sparse(ei,ej,vals,m^2,m^2)
+    return sparse(ei,ej,vals,n*m,n*m)
 end
 
