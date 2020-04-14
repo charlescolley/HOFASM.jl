@@ -49,13 +49,16 @@
 -----------------------------------------------------------------------------"""
 function synthetic_HOFASM(n::Int,sigma::Float64;method="new")
 
-    println("test")
     m = n
     source_points = randn(Float64,n,2)
     target_points = Array{Float64,2}(undef,n,2)
     for i =1:n
         target_points[i,:] = source_points[i,:] + randn(2)*sigma
     end
+
+    #shuffle the target points
+    p = shuffle(1:n)
+    target_points = target_points[p,:]
 
     #find all the triangles in between the points
     source_triangles = brute_force_triangles(source_points)
@@ -75,7 +78,7 @@ function synthetic_HOFASM(n::Int,sigma::Float64;method="new")
         x, iteration_time = @timed HOFASM_iterations(marg_ten_pairs,n,m)
     elseif method == "orig"
         marginalized_tensors,kron_time =
-          @timed [implicit_kronecker_mode1_marginalization(Bn_ind,Bn_val,Hn_ind,n,m) for (Bn_ind,Bn_val,Hn_ind)
+          @timed [perm_marginalize(Hn_ind,Bn_ind,Bn_val,n,m) for (Bn_ind,Bn_val,Hn_ind)
         in zip(bases_tensor_indices,bases_tensor_vals,index_tensor_indices)]
 
         x, iteration_time = @timed HOFASM_iterations(marginalized_tensors,n,m)
@@ -88,7 +91,7 @@ function synthetic_HOFASM(n::Int,sigma::Float64;method="new")
         throw(ArgumentError("valid method: must be 'new', 'orig', or 'orig2'"))
     end
     #transpose is needed because reshape is colmajor formatted
-    return Array(reshape(x,m,n)'), kron_time, iteration_time
+    return Array(reshape(x,m,n)'), kron_time, iteration_time, p
 
 end
 
