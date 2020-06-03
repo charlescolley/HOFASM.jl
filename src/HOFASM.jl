@@ -7,6 +7,9 @@ using Statistics
 using Random
 using Arpack
 
+using ImageFeatures  #used for demos
+
+
 
 include("triangles.jl")
 include("contraction.jl")

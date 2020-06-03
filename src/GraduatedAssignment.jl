@@ -32,12 +32,14 @@ function Bistochastic_Normalization!(x::Array{Float64,1},iterations::Int,n::Int,
 
 end
 
-function build_assignment(X::Array{Float64,2};use_colsort::Bool=false)
+function build_assignment(X::Array{Float64,2};use_colsort::Bool=false,
+                          return_matrix=false)
     """-------------------------------------------------------------------------
         For a HOFASM_iteration matrix result X, computing a greedy matching on
       the maximum elements of the columns sequentially. if using the option
       use_colsort, will find the matching in the columns ordered by the largest
-      element of each column.
+      element of each column. If return_matrix is true, a matrix is returned of
+      the same dimensions as X, but X(i,j) =  1 iff i is matched to j.
 
       Notes:
       ------
@@ -45,8 +47,9 @@ function build_assignment(X::Array{Float64,2};use_colsort::Bool=false)
     -------------------------------------------------------------------------"""
     n, m = size(X)
     selected_vertices = Set{Int}()
-    matching = Array{Tuple{Int,Int},1}(undef,n)
+    matching = Array{Tuple{Int,Int},1}(undef,minimum((n,m)))
     index = 1
+
     if use_colsort
         col_order = sortperm([maximum(X[:,i]) for i in 1:m],rev=true)
     else
@@ -66,7 +69,15 @@ function build_assignment(X::Array{Float64,2};use_colsort::Bool=false)
         index += 1
         push!(selected_vertices,arg_max)
     end
-    return matching
+    if return_matrix
+        Z = zeros(n,m)
+        for (i,j) in matching
+            Z[i,j] = 1
+        end
+        return Z
+    else
+        return matching
+    end
 end
 
 
@@ -301,6 +312,90 @@ function HOM_graduated_assignment(marg_tensor::SparseMatrixCSC{Float64,Int64},ma
 
 end
 
+#Sequential Second-order expansion for higher order matching
+function SSoEfHOM(tensor_pairs::Array{NTuple{2,SparseMatrixCSC{Float64,Int64}},1},n::Int,
+                  m::Int, max_iterations::Int=12,tol::Float64=1e-4)
+
+
+    X_k::Array{Float64,2} = rand(Float64,n,m)
+    beta = 30 # constant from the paper
+
+    X_k_1 = Array{Float64,2}(undef,n,m)
+    B_k_1 = Array{Float64,2}(undef,n,m)
+    temp2 = Array{Float64,2}(undef,n,m)
+    i = 1
+
+    preprocessed_pairs = [(findnz(H)...,B) for (H,B) in tensor_pairs]
+
+    HOFASM_contraction!(preprocessed_pairs,X_k,X_k_1)
+    S_opt = dot(X_k,X_k_1)
+    x_opt = build_assignment(rand(n,m),return_matrix=true)
+
+
+    while true
+
+        #Graduated assignment routine
+        max_elem = maximum(X_k_1)
+        inflation_normalization = x -> exp(x*beta/max_elem)
+        broadcast!(inflation_normalization,B_k_1,X_k_1)
+
+        while true
+
+            X_normalized = copy(B_k_1)
+            Bistochastic_Normalization!(X_normalized,15)
+
+            if norm(X_normalized - B_k_1) < 1e-6
+                B_k_1 = X_normalized
+                break
+            else
+                B_k_1 = copy(X_normalized)
+            end
+        end
+
+        B_k_1 = build_assignment(B_k_1,return_matrix=true)
+
+        diff = B_k_1-X_k_1
+        println(norm(diff))
+        C = dot(X_k_1,diff)
+    #    println(C)
+
+
+        HOFASM_contraction!(preprocessed_pairs,diff,temp2)
+        D = dot(diff,temp2)
+#        println(D)
+
+
+        if D >= 0
+            X_k = copy(B_k_1)
+        else
+            r = minimum((-C/D,1))
+            X_k .+= r * diff
+        end
+
+        temp3 = copy(B_k_1)
+        HOFASM_contraction!(preprocessed_pairs,B_k_1,temp3)
+        S = dot(temp3,B_k_1)
+        println(S)
+
+        if S >= S_opt
+            x_opt = copy(B_k_1)
+            S_opt = S
+        end
+
+
+  #      println(X_k)
+
+        i += 1
+        if i >= max_iterations
+            break
+        else
+            #tensor vector contraction
+            HOFASM_contraction!(preprocessed_pairs,X_k,X_k_1)
+        end
+    end
+
+    return x_opt
+end
 
 #=
 #TODO: could generalize to take a contraction function to unify all graduated assignment routines

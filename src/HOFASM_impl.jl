@@ -95,6 +95,13 @@ function synthetic_HOFASM(n::Int,sigma::Float64,outliers::Int=0,scale::Float64=1
         kron_time = 0.0
         x, iteration_time = @timed HOFASM_iterations(bases_tensor_indices,
                                                      bases_tensor_vals,index_tensor_indices,n,m)
+    elseif method == "SSoEfHOM"
+        marg_ten_pairs, kron_time =
+            @timed Make_HOFASM_tensor_pairs(index_tensor_indices,bases_tensor_indices,
+                                            bases_tensor_vals,n,m)
+
+        x, iteration_time = @timed SSoEfHOM(marg_ten_pairs,n,m)
+
     else
         throw(ArgumentError("valid method: must be 'new', 'orig', or 'orig2'"))
     end
