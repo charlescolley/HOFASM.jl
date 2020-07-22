@@ -194,6 +194,7 @@ function HOFASM_contraction!(tensor_pairs::Array{NTuple{2,SparseMatrixCSC{Float6
 
 end
 
+
 """----------------------------------------------------------------------------
     Computes the contraction C(1,x) using list of pairs of the marginalized Hn
   Bn pairs. Hn is typically quite sparse, so it's more efficient to figure out
@@ -226,6 +227,8 @@ function HOFASM_contraction!(tensor_pairs::Array{Tuple{Array{Int,1},Array{Int,1}
 
 
 end
+
+
 
 """----------------------------------------------------------------------------
 ----------------------------------------------------------------------------"""

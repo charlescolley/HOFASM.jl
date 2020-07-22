@@ -108,7 +108,7 @@ function HOFASM_iterations(Bn_indices_list::Array{Array{Int,2},1},Bn_vals_list::
             x_normalized = copy(x_k_1)
             Bistochastic_Normalization!(x_normalized,15,n,m)
   #          print(f"{norm(X_normalized - X_k_1,'fro')}")
-            if norm(x_normalized - x_k_1) < 1e-6
+            if norm(x_normalized - x_k_1) < 1e-4
                 x_k_1 = x_normalized
                 break
             else
@@ -205,7 +205,7 @@ function HOFASM_iterations(tensor_pairs::Array{NTuple{2,SparseMatrixCSC{Float64,
 
     while true
 
-  #      HOFASM_contraction!(tensor_pairs,X_k,X_k_1)
+  #      HOFASM_contraction!_test(tensor_pairs,X_k,X_k_1)
         HOFASM_contraction!(preprocessed_pairs,X_k,X_k_1)
 
  #       SIMD_sparse_matrix_multiplication(Hn_matrices,Bn_matrices,X_k,X_k_1)
@@ -233,7 +233,7 @@ function HOFASM_iterations(tensor_pairs::Array{NTuple{2,SparseMatrixCSC{Float64,
             Bistochastic_Normalization!(X_normalized,15)
   #          println("BN")
    #         print("{norm(X_normalized - X_k_1,'fro')}")
-            if norm(X_normalized - X_k_1) < 1e-6
+            if norm(X_normalized - X_k_1) < 1e-4
                 X_k_1 = X_normalized
                 break
             else

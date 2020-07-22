@@ -46,15 +46,17 @@ end
 
 
 
-function timing_experiments(;method="HOFASM",sub_method="new")
+function timing_experiments(average_over = 100;method="HOFASM",sub_method="new")
  #   kron_formation_times = []
     run_times = []
     n_values = [10,20,30,40,60,80,100]
-    average_over = 100
+    Experiments = Dict()
     sigma = 1.0
 
     for n in n_values
 
+        kron_results = []
+        runtime_results = []
 #        kron_time = 0.0
         run_time = 0.0
         for i in 1:average_over+1
@@ -68,18 +70,66 @@ function timing_experiments(;method="HOFASM",sub_method="new")
             if i == 0
                 continue #skip due to compile time
             end
+
+            push!(runtime_results,rt+kt)
  #           kron_time += kt
-            run_time += rt + kt
         end
+        Experiments[n] = runtime_results
 
  #       push!(kron_formation_times,kron_time/average_over)
-        push!(run_times,run_time/average_over)
+      #  push!(run_times,run_time/average_over)
 
         println("finished problem size $n")
     end
 
 #    kron_formation_times,
-    return  run_times
+    return Experiments
+end
+
+function distributed_timing_experiments(num_procs::Int, average_over = 100;method="HOFASM",sub_method="new")
+
+    @everywhere include_string(Main,$(read("HOFASM.jl",String)),"HOFASM.jl")
+ #   kron_formation_times = []
+    run_times = []
+    n_values = [10,20,30]#,40,60,80,100]
+    Experiments = Dict()
+    sigma = 1.0
+
+    for n in n_values
+
+        runtime_results = []
+        futures = []
+#        kron_time = 0.0
+        run_time = 0.0
+        for i in 1:average_over
+
+            if method == "HOFASM"
+                f = @spawn synthetic_HOFASM(n,sigma,method=sub_method)
+                #_ , kt, rt, _ = synthetic_HOFASM(n,sigma,method=sub_method)
+            elseif method == "HOM"
+                f = @spawn synthetic_HOM(n,sigma)
+
+            end
+            push!(futures,f)
+ #           kron_time += kt
+        end
+
+        for future in futures
+            if method == "HOFASM"
+                _ , kt, rt, _ = fetch(future)
+            elseif method == "HOM"
+                kt = 0.0
+                _, rt, _ = fetch(future)
+            end
+            push!(runtime_results,kt+rt)
+        end
+
+        Experiments[n] = runtime_results
+        println("finished problem size $n")
+    end
+
+#    kron_formation_times,
+    return Experiments
 end
 
 function accuracy_experiments(average_over::Int = 2;method="HOFASM",sub_method="new")

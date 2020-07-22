@@ -49,6 +49,8 @@
 -----------------------------------------------------------------------------"""
 function synthetic_HOFASM(n::Int,sigma::Float64,outliers::Int=0,scale::Float64=1.0;method="new")
 
+    #Random.seed!(1234)
+
     source_points = randn(Float64,n+outliers,2)
     target_points = Array{Float64,2}(undef,n+outliers,2)
     for i::Int =1:n
@@ -68,6 +70,7 @@ function synthetic_HOFASM(n::Int,sigma::Float64,outliers::Int=0,scale::Float64=1
     p = shuffle(1:n)
     target_points = target_points[p,:]
 
+
     #find all the triangles in between the points
     source_triangles = brute_force_triangles(source_points)
     target_triangles = brute_force_triangles(target_points)
@@ -75,6 +78,7 @@ function synthetic_HOFASM(n::Int,sigma::Float64,outliers::Int=0,scale::Float64=1
     index_tensor_indices, index_tensor_vals , bases_tensor_indices, bases_tensor_vals =
         build_index_and_bases_tensors(source_triangles, target_triangles, 5.0)
 
+#    return index_tensor_indices, index_tensor_vals , bases_tensor_indices, bases_tensor_vals
 #    n = maximum([maximum(x) for x in index_tensor_indices if length(x) != 0])
 #    m = maximum([maximum(x) for x in bases_tensor_indices if length(x) != 0])
 
@@ -82,7 +86,12 @@ function synthetic_HOFASM(n::Int,sigma::Float64,outliers::Int=0,scale::Float64=1
         marg_ten_pairs, kron_time =
             @timed Make_HOFASM_tensor_pairs(index_tensor_indices,bases_tensor_indices,
                                             bases_tensor_vals,n,m)
-
+        #=
+        marg_ten_pairs, kron_time =
+            @timed Make_HOFASM_tensor_pairs_test(index_tensor_indices,bases_tensor_indices,
+                                            bases_tensor_vals,n,m)
+        =#
+        #return marg_ten_pairs
         x, iteration_time = @timed HOFASM_iterations(marg_ten_pairs,n,m)
     elseif method == "orig"
         marginalized_tensors,kron_time =
@@ -302,15 +311,21 @@ function build_index_and_bases_tensors(image1_triangles::Array{Tuple{Tuple{Int,I
         angle_bin_size=1e-16 #each angle gets their own bin
         avg_bins = true
     end
+
     approx_tensors =
         build_list_of_approx_tensors(image1_triangles, angle_bin_size,
                                      avg_bins = avg_bins,
                                      test_mode=test_mode)
+    #=
+    approx_tensors =
+        build_list_of_approx_tensors_test(image1_triangles, angle_bin_size,
+                                     avg_bins = avg_bins,
+                                     test_mode=test_mode)
+    =#
     approx_triangles =
       Matrix(reshape(collect(Iterators.flatten(keys(approx_tensors))),(3,length(approx_tensors)))')
     bases_tensors = build_angle_difference_tensors(approx_triangles,image2_triangles,
                                                    test_mode=test_mode)
-
     #build lists of indices and non-zeros values in order of sorted approximate angles
 
     #convert index tensor formats
