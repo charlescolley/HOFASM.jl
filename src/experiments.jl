@@ -86,12 +86,12 @@ function timing_experiments(average_over = 100;method="HOFASM",sub_method="new")
     return Experiments
 end
 
-function distributed_timing_experiments(num_procs::Int, average_over = 100;method="HOFASM",sub_method="new")
+function distributed_timing_experiments(average_over = 100;method="HOFASM",sub_method="new")
 
     @everywhere include_string(Main,$(read("HOFASM.jl",String)),"HOFASM.jl")
  #   kron_formation_times = []
     run_times = []
-    n_values = [10,20,30]#,40,60,80,100]
+    n_values = [10,20,30,40,60,80,100]
     Experiments = Dict()
     sigma = 1.0
 
@@ -108,7 +108,6 @@ function distributed_timing_experiments(num_procs::Int, average_over = 100;metho
                 #_ , kt, rt, _ = synthetic_HOFASM(n,sigma,method=sub_method)
             elseif method == "HOM"
                 f = @spawn synthetic_HOM(n,sigma)
-
             end
             push!(futures,f)
  #           kron_time += kt
@@ -136,17 +135,14 @@ function accuracy_experiments(average_over::Int = 2;method="HOFASM",sub_method="
 
     sigmas = [.025,.05,.0725,.1,.125,.15,.175,.2]
 
-    colsort_accuracies = []
-    colsort_variances = []
+    Experiments = Dict()
 
     n = 30
 
-
     for sigma in sigmas
 
+        colsort_accuracies = []
 #        kron_time = 0.0
-        test_argsort_accuracies = []
-        test_colsort_accuracies = []
 
         for i in 1:average_over
             if method == "HOFASM"
@@ -159,14 +155,57 @@ function accuracy_experiments(average_over::Int = 2;method="HOFASM",sub_method="
 
             colsort_accuracy = sum([1.0 for (i,j) in assignment if p[i] == j])/n
 
-            push!(test_colsort_accuracies,colsort_accuracy)
+            push!(colsort_accuracies,colsort_accuracy)
         end
 
-        push!(colsort_variances,var(test_colsort_accuracies))
-        push!(colsort_accuracies,sum(test_colsort_accuracies)/average_over)
+        Experiments[sigma] = colsort_accuracies
     end
 
-    return colsort_variances, colsort_accuracies
+    return Experiments
+end
+
+function distributed_accuracy_experiments(average_over::Int = 2;method="HOFASM",sub_method="new")
+
+    @everywhere include_string(Main,$(read("HOFASM.jl",String)),"HOFASM.jl")
+    sigmas = [.025,.05,.0725,.1,.125,.15,.175,.2]
+
+    Experiments = Dict()
+
+    n = 30
+
+    for sigma in sigmas
+
+        futures = []
+#        kron_time = 0.0
+
+        for i in 1:average_over
+            if method == "HOFASM"
+                f = @spawn synthetic_HOFASM(n,sigma,method=sub_method)
+            elseif method == "HOM"
+                f = @spawn synthetic_HOM(n,sigma)
+            end
+            push!(futures,f)
+            #transpose is need to maintain row major format
+        end
+
+        colsort_accuracies = []
+        for future in futures
+            if method == "HOFASM"
+                X , _, _, p  = fetch(future)
+            elseif method == "HOM"
+                X, _, p  = fetch(future)
+            end
+
+            assignment = build_assignment(X,use_colsort=true)
+            colsort_accuracy = sum([1.0 for (i,j) in assignment if p[i] == j])/n
+
+            push!(colsort_accuracies,colsort_accuracy)
+        end
+
+        Experiments[sigma] = colsort_accuracies
+    end
+
+    return Experiments
 end
 
 function outlier_experiments(average_over::Int = 2;method="HOFASM")

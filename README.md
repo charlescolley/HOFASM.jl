@@ -16,7 +16,7 @@ Contents
  * contraction.jl:     
    Routines for computing the tensor contractions in the gradients
  * experiments.jl:
- Routines for running alignments between images, or the synthetic experiment framework developed by [Zass and Shashua](https://www.cse.huji.ac.il/~shashua/papers/matching-cvpr08.pdf). Currently supports testing for outliers, scalings, and normal noise. 
+ Routines for running alignments between images, or the synthetic experiment framework developed by [Zass and Shashua](https://www.cse.huji.ac.il/~shashua/papers/matching-cvpr08.pdf). Currently supports testing for outliers, scalings, and normal noise. Note that Distributed routines must be run in the src folder because of how the @everywhere macro is being used. 
 * triangles.jl: 
   Contains functions for computing triangle angles between the points. Planning to add in methods to build triangles from Delaunay mesh and nearest neighbor graphs. 
     
@@ -24,7 +24,7 @@ Dependencies
 ===========
 [LinearAlgebra](https://docs.julialang.org/en/v1/stdlib/LinearAlgebra/), [SparseArrays](https://docs.julialang.org/en/v1/stdlib/SparseArrays/), and [Arpack](https://github.com/JuliaLinearAlgebra/Arpack.jl) for any sparse numerical linear algebra routines needed, coupled with [Combinatorics](https://github.com/JuliaMath/Combinatorics.jl) for implicit transpose operations. 
 
-[Statistics](https://docs.julialang.org/en/v1/stdlib/Statistics/) and [Random](https://docs.julialang.org/en/v1/stdlib/Random/) for synthetic experiments.
+[Statistics](https://docs.julialang.org/en/v1/stdlib/Statistics/) and [Random](https://docs.julialang.org/en/v1/stdlib/Random/) for synthetic experiments. [Distributed](https://docs.julialang.org/en/v1/stdlib/Distributed/) is used for the distributed experiment drivers. 
 
 [ImageFeatures](https://juliaimages.org/ImageFeatures.jl/stable/) to find features in test images produced by users. 
 
