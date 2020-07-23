@@ -93,14 +93,14 @@ function synthetic_HOFASM(n::Int,sigma::Float64,outliers::Int=0,scale::Float64=1
         =#
         #return marg_ten_pairs
         x, iteration_time = @timed HOFASM_iterations(marg_ten_pairs,n,m)
-    elseif method == "orig"
+    elseif method == "orig" #explicit marginalization
         marginalized_tensors,kron_time =
           @timed [perm_marginalize(Hn_ind,Bn_ind,Bn_val,n,m) for (Bn_ind,Bn_val,Hn_ind)
         in zip(bases_tensor_indices,bases_tensor_vals,index_tensor_indices)]
 
         x, iteration_time = @timed HOFASM_iterations(marginalized_tensors,n,m)
 
-    elseif method =="orig2"
+    elseif method =="orig2" # implicit marginalization
         kron_time = 0.0
         x, iteration_time = @timed HOFASM_iterations(bases_tensor_indices,
                                                      bases_tensor_vals,index_tensor_indices,n,m)
