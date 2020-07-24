@@ -46,7 +46,7 @@ end
 
 
 
-function timing_experiments(average_over = 100;method="HOFASM",sub_method="new")
+function timing_experiments(average_over = 100,seed=false;method="HOFASM",sub_method="new")
  #   kron_formation_times = []
     run_times = []
     n_values = [10,20,30,40,60,80,100]
@@ -94,6 +94,7 @@ function distributed_timing_experiments(nprocs::Int,average_over = 100;method="H
  #   kron_formation_times = []
 
     n_values = [10,20,30,40,60,80,100]
+
     Experiments = Dict()
     sigma = 1.0
 
@@ -112,11 +113,11 @@ function distributed_timing_experiments(nprocs::Int,average_over = 100;method="H
                 _, rt, _  = synthetic_HOM(n,sigma)
             end
 
-            if i == 0
-              continue #skip run with compile time
+            if i == 1
+                continue #skip run with compile time
+            else
+                push!(results,kt+rt)
             end
-
-            push!(results,kt+rt)
 
         end
         return results
@@ -147,7 +148,7 @@ function distributed_timing_experiments(nprocs::Int,average_over = 100;method="H
     return Experiments
 end
 
-function accuracy_experiments(average_over::Int = 2;method="HOFASM",sub_method="new")
+function accuracy_experiments(average_over::Int = 2,seed=false;method="HOFASM",sub_method="new")
 
     sigmas = [.025,.05,.0725,.1,.125,.15,.175,.2]
 
@@ -155,6 +156,12 @@ function accuracy_experiments(average_over::Int = 2;method="HOFASM",sub_method="
 
     n = 30
 
+    if seed
+        Random.seed!(0)
+        seeds = rand(UInt64,length(sigmas), average_over)
+    end
+
+    sigma_exp_j = 1
     for sigma in sigmas
 
         colsort_accuracies = []
@@ -162,9 +169,9 @@ function accuracy_experiments(average_over::Int = 2;method="HOFASM",sub_method="
 
         for i in 1:average_over
             if method == "HOFASM"
-                X , _, _, p  = synthetic_HOFASM(n,sigma,method=sub_method)
+                X , _, _, p  = synthetic_HOFASM(n,sigma,method=sub_method;seed=seeds[sigma_exp_j,i])
             elseif method == "HOM"
-                X,_, p  = synthetic_HOM(n,sigma)
+                X,_, p  = synthetic_HOM(n,sigmal;seed=seeds[sigma_exp_j,i])
             end
             #transpose is need to maintain row major format
             assignment = build_assignment(X,use_colsort=true)
@@ -175,20 +182,27 @@ function accuracy_experiments(average_over::Int = 2;method="HOFASM",sub_method="
         end
 
         Experiments[sigma] = colsort_accuracies
+        sigma_exp_j += 1
     end
 
     return Experiments
 end
 
-function distributed_accuracy_experiments(average_over::Int = 2;method="HOFASM",sub_method="new")
+function distributed_accuracy_experiments(average_over::Int = 2,seed=false;method="HOFASM",sub_method="new")
 
     @everywhere include_string(Main,$(read("HOFASM.jl",String)),"HOFASM.jl")
     sigmas = [.025,.05,.0725,.1,.125,.15,.175,.2]
+
+    if seed
+        Random.seed!(0)
+        seeds = rand(UInt64, length(sigmas), average_over)
+    end
 
     Experiments = Dict()
 
     n = 30
 
+    sigma_exp_j = 1
     for sigma in sigmas
 
         futures = []
@@ -196,9 +210,9 @@ function distributed_accuracy_experiments(average_over::Int = 2;method="HOFASM",
 
         for i in 1:average_over
             if method == "HOFASM"
-                f = @spawn synthetic_HOFASM(n,sigma,method=sub_method)
+                f = @spawn synthetic_HOFASM(n,sigma,method=sub_method;seed=seeds[sigma_exp_j,i])
             elseif method == "HOM"
-                f = @spawn synthetic_HOM(n,sigma)
+                f = @spawn synthetic_HOM(n,sigma;seed=seeds[sigma_exp_j,i])
             end
             push!(futures,f)
             #transpose is need to maintain row major format
@@ -219,6 +233,7 @@ function distributed_accuracy_experiments(average_over::Int = 2;method="HOFASM",
         end
 
         Experiments[sigma] = colsort_accuracies
+        sigma_exp_j += 1
     end
 
     return Experiments

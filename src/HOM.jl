@@ -1,5 +1,9 @@
 
-function synthetic_HOM(n::Int,sigma::Float64,outliers::Int=0,scale::Float64=1.0)
+function synthetic_HOM(n::Int,sigma::Float64,outliers::Int=0,scale::Float64=1.0;seed=nothing)
+
+    if seed !== nothing
+        Random.seed!(seed)
+    end
 
     d = 2
     source_points = randn(Float64,n+outliers,d)

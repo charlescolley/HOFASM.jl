@@ -47,9 +47,11 @@
   * iteration_time - (Float64):
     The run time of the graduated assignment step.
 -----------------------------------------------------------------------------"""
-function synthetic_HOFASM(n::Int,sigma::Float64,outliers::Int=0,scale::Float64=1.0;method="new")
+function synthetic_HOFASM(n::Int,sigma::Float64,outliers::Int=0,scale::Float64=1.0;method="new",seed=nothing)
 
-    #Random.seed!(1234)
+    if seed !== nothing
+        Random.seed!(seed)
+    end
 
     source_points = randn(Float64,n+outliers,2)
     target_points = Array{Float64,2}(undef,n+outliers,2)
