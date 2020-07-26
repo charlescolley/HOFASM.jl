@@ -53,6 +53,12 @@ function timing_experiments(average_over = 100,seed=false;method="HOFASM",sub_me
     Experiments = Dict()
     sigma = 1.0
 
+    if seed
+        Random.seed!(0)
+        seeds = rand(UInt64, length(n_values), average_over+1)
+    end
+
+    n_exp_j = 1
     for n in n_values
 
         kron_results = []
@@ -61,21 +67,20 @@ function timing_experiments(average_over = 100,seed=false;method="HOFASM",sub_me
         run_time = 0.0
         for i in 1:average_over+1
             if method == "HOFASM"
-                _ , kt, rt, _ = synthetic_HOFASM(n,sigma,method=sub_method)
+                _ , kt, rt, _ = synthetic_HOFASM(n,sigma,method=sub_method,seed = seeds[n_exp_j,i])
             elseif method == "HOM"
                 kt = 0.0
-                _, rt, _ = synthetic_HOM(n,sigma)
+                _, rt, _ = synthetic_HOM(n,sigma,seed = seeds[n_exp_j,i])
             end
 
             if i == 0
                 continue #skip due to compile time
             end
-
             push!(runtime_results,rt+kt)
  #           kron_time += kt
         end
         Experiments[n] = runtime_results
-
+             n_exp_j += 1
  #       push!(kron_formation_times,kron_time/average_over)
       #  push!(run_times,run_time/average_over)
 
@@ -86,7 +91,7 @@ function timing_experiments(average_over = 100,seed=false;method="HOFASM",sub_me
     return Experiments
 end
 
-function distributed_timing_experiments(nprocs::Int,average_over = 100;method="HOFASM",sub_method="new")
+function distributed_timing_experiments(nprocs::Int,average_over = 100,seed=true;method="HOFASM",sub_method="new")
 
     @assert average_over % nprocs == 0 #must divide for simplicitly
 
@@ -94,6 +99,13 @@ function distributed_timing_experiments(nprocs::Int,average_over = 100;method="H
  #   kron_formation_times = []
 
     n_values = [10,20,30,40,60,80,100]
+
+    if seed
+        Random.seed!(0)
+        seeds = rand(UInt64, length(n_values), average_over+nprocs)
+    end
+
+    n_exp_j = 1
 
     Experiments = Dict()
     sigma = 1.0
