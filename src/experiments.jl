@@ -91,7 +91,7 @@ function timing_experiments(average_over = 100,seed=false;method="HOFASM",sub_me
     return Experiments
 end
 
-function distributed_timing_experiments(nprocs::Int,average_over = 100,seed=true;method="HOFASM",sub_method="new")
+function distributed_timing_experiments(nprocs::Int,average_over = 100,seed=false;method="HOFASM",sub_method="new")
 
     @assert average_over % nprocs == 0 #must divide for simplicitly
 
@@ -100,29 +100,32 @@ function distributed_timing_experiments(nprocs::Int,average_over = 100,seed=true
 
     n_values = [10,20,30,40,60,80,100]
 
+    trials_per_process = Int(average_over/nprocs)
+
     if seed
         Random.seed!(0)
-        seeds = rand(UInt64, length(n_values), average_over+nprocs)
+        seeds = rand(UInt64, length(n_values),nprocs,trials_per_process + 1)
     end
 
-    n_exp_j = 1
 
     Experiments = Dict()
     sigma = 1.0
 
-    trials_per_process = Int(average_over/nprocs)
 
-    function sub_tests(trials,n,sigma,method,sub_method)
+    function sub_tests(trials,n,sigma,method,sub_method;seeds::Array{UInt,1}=nothing)
 
+        if seeds !== nothing
+            @assert length(seeds) == trials+1
+        end
         results = []
         for i in 1:trials + 1
 
             if method == "HOFASM"
-                _ , kt, rt, _  = synthetic_HOFASM(n,sigma,method=sub_method)
+                _ , kt, rt, _  = synthetic_HOFASM(n,sigma,method=sub_method;seed = seeds[i])
                 #_ , kt, rt, _ = synthetic_HOFASM(n,sigma,method=sub_method)
             elseif method == "HOM"
                 kt = 0.0
-                _, rt, _  = synthetic_HOM(n,sigma)
+                _, rt, _  = synthetic_HOM(n,sigma;seed = seeds[i])
             end
 
             if i == 1
@@ -135,13 +138,14 @@ function distributed_timing_experiments(nprocs::Int,average_over = 100,seed=true
         return results
     end
 
+    n_exp_j = 1
     for n in n_values
 
         runtime_results = []
         futures = []
 
         for p in 2:nprocs +1  #leave process 1 as the parent process
-            f = @spawnat p sub_tests(trials_per_process,n,sigma,method,sub_method)
+            f = @spawnat p sub_tests(trials_per_process,n,sigma,method,sub_method;seeds = seeds[n_exp_j,p-1,:])
             push!(futures,f)
         end
 
@@ -153,6 +157,7 @@ function distributed_timing_experiments(nprocs::Int,average_over = 100,seed=true
         end
 
         Experiments[n] = runtime_results
+        n_exp_j += 1
         println("finished problem size $n")
     end
 
