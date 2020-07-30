@@ -85,14 +85,15 @@ function synthetic_HOFASM(n::Int,sigma::Float64,outliers::Int=0,scale::Float64=1
 #    m = maximum([maximum(x) for x in bases_tensor_indices if length(x) != 0])
 
     if method == "new"
+        #=
         marg_ten_pairs, kron_time =
             @timed Make_HOFASM_tensor_pairs(index_tensor_indices,bases_tensor_indices,
                                             bases_tensor_vals,n,m)
-        #=
+        =#
         marg_ten_pairs, kron_time =
             @timed Make_HOFASM_tensor_pairs_test(index_tensor_indices,bases_tensor_indices,
                                             bases_tensor_vals,n,m)
-        =#
+
         #return marg_ten_pairs
         x, iteration_time = @timed HOFASM_iterations(marg_ten_pairs,n,m)
     elseif method == "orig" #explicit marginalization
@@ -313,17 +314,17 @@ function build_index_and_bases_tensors(image1_triangles::Array{Tuple{Tuple{Int,I
         angle_bin_size=1e-16 #each angle gets their own bin
         avg_bins = true
     end
-
+    #=
     approx_tensors =
         build_list_of_approx_tensors(image1_triangles, angle_bin_size,
                                      avg_bins = avg_bins,
                                      test_mode=test_mode)
-    #=
+    =#
     approx_tensors =
         build_list_of_approx_tensors_test(image1_triangles, angle_bin_size,
                                      avg_bins = avg_bins,
                                      test_mode=test_mode)
-    =#
+
     approx_triangles =
       Matrix(reshape(collect(Iterators.flatten(keys(approx_tensors))),(3,length(approx_tensors)))')
     bases_tensors = build_angle_difference_tensors(approx_triangles,image2_triangles,

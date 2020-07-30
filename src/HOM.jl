@@ -35,7 +35,7 @@ function synthetic_HOM(n::Int,sigma::Float64,outliers::Int=0,scale::Float64=1.0;
     #marg_result = reshape(HOM_graduated_assignment(marginalized_tensor),n,n)
     #lam, vec, _ = eigs(marginalized_tensor,nev=1)
 
-    Graduated_Assignment_res, runtime = @timed Array(reshape(HOM_graduated_assignment(marginalized_tensor),n,n)')
+    Graduated_Assignment_res, runtime = @timed Array(reshape(HOM_graduated_assignment(marginalized_tensor,m),n,n)')
 
     return Graduated_Assignment_res, runtime , p
     #ten_result = reshape(HOM_graduated_assignment(ssten.COOTen(indices,vals)),n,n)

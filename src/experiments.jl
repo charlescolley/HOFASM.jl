@@ -45,6 +45,37 @@ function align_photos(img_1,img_2)
 end
 
 
+function align_embeddings(source::Array{Float64,2},target::Array{Float64,2};method="HOFASM")
+
+    n = size(source,1)
+    m = size(target,1)
+
+    source_triangles = brute_force_triangles(source)
+    target_triangles = brute_force_triangles(target)
+
+
+    if method == "HOFASM"
+        #build tensors
+        index_tensor_indices, index_tensor_vals , bases_tensor_indices, bases_tensor_vals =
+        build_index_and_bases_tensors(source_triangles, target_triangles, 5.0)
+
+        marg_ten_pairs, kron_time =
+            @timed Make_HOFASM_tensor_pairs(index_tensor_indices,bases_tensor_indices,
+                                            bases_tensor_vals,n,m)
+
+        x, iteration_time = @timed HOFASM_iterations(marg_ten_pairs,n,m)
+
+    elseif method == "HOM"
+        indices, vals = produce_HOM_tensor(source_triangles,target_triangles,m,tol=1e-12)
+        marginalized_tensor = sym_mode1_marginalization(indices,vals,n*m)
+        x =  Array(reshape(HOM_graduated_assignment(marginalized_tensor,m),n,m)')
+    else
+        raise()
+    end
+
+    return x, build_assignment(x,use_colsort=true)
+end
+
 
 function timing_experiments(average_over = 100,seed=false;method="HOFASM",sub_method="new")
  #   kron_formation_times = []
@@ -176,6 +207,8 @@ function accuracy_experiments(average_over::Int = 2,seed=false;method="HOFASM",s
     if seed
         Random.seed!(0)
         seeds = rand(UInt64,length(sigmas), average_over)
+    else
+        exp_seed = nothing
     end
 
     sigma_exp_j = 1
@@ -185,8 +218,12 @@ function accuracy_experiments(average_over::Int = 2,seed=false;method="HOFASM",s
 #        kron_time = 0.0
 
         for i in 1:average_over
+            if seed
+                exp_seed = seeds[sigma_exp_j,i]
+            end
+
             if method == "HOFASM"
-                X , _, _, p  = synthetic_HOFASM(n,sigma,method=sub_method;seed=seeds[sigma_exp_j,i])
+                X , _, _, p  = synthetic_HOFASM(n,sigma,method=sub_method;seed=exp_seed)
             elseif method == "HOM"
                 X,_, p  = synthetic_HOM(n,sigmal;seed=seeds[sigma_exp_j,i])
             end
@@ -213,6 +250,8 @@ function distributed_accuracy_experiments(average_over::Int = 2,seed=false;metho
     if seed
         Random.seed!(0)
         seeds = rand(UInt64, length(sigmas), average_over)
+    else
+        seed = nothing
     end
 
     Experiments = Dict()
@@ -226,8 +265,13 @@ function distributed_accuracy_experiments(average_over::Int = 2,seed=false;metho
 #        kron_time = 0.0
 
         for i in 1:average_over
+
+            if seed
+                exp_seed = seeds[sigma_exp_j,i]
+            end
+
             if method == "HOFASM"
-                f = @spawn synthetic_HOFASM(n,sigma,method=sub_method;seed=seeds[sigma_exp_j,i])
+                f = @spawn synthetic_HOFASM(n,sigma,method=sub_method;seed=exp_seed)
             elseif method == "HOM"
                 f = @spawn synthetic_HOM(n,sigma;seed=seeds[sigma_exp_j,i])
             end

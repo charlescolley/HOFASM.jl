@@ -18,7 +18,7 @@ end
 
 function Bistochastic_Normalization!(x::Array{Float64,1},iterations::Int,n::Int,m::Int)
 
-    X = reshape(x,m,n)
+    X = reshape(x,n,m)
 
     for _ in 1:iterations
         for i = 1:n
@@ -47,14 +47,17 @@ function build_assignment(X::Array{Float64,2};use_colsort::Bool=false,
     -------------------------------------------------------------------------"""
     n, m = size(X)
     selected_vertices = Set{Int}()
-    matching = Array{Tuple{Int,Int},1}(undef,minimum((n,m)))
+    match_size = minimum((n,m))
+    matching = Array{Tuple{Int,Int},1}(undef,match_size)
     index = 1
 
     if use_colsort
         col_order = sortperm([maximum(X[:,i]) for i in 1:m],rev=true)
     else
-        col_order = 1:m
+        col_order = 1:match_size
     end
+
+
 
     for j in col_order #search over columns
         max_val = -Inf
@@ -68,6 +71,9 @@ function build_assignment(X::Array{Float64,2};use_colsort::Bool=false,
         matching[index] = (j,arg_max)
         index += 1
         push!(selected_vertices,arg_max)
+        if index > match_size
+            break
+        end
     end
     if return_matrix
         Z = zeros(n,m)
@@ -205,7 +211,7 @@ function HOFASM_iterations(tensor_pairs::Array{NTuple{2,SparseMatrixCSC{Float64,
 
     while true
 
-  #      HOFASM_contraction!_test(tensor_pairs,X_k,X_k_1)
+#        HOFASM_contraction!_test(tensor_pairs,X_k,X_k_1)
         HOFASM_contraction!(preprocessed_pairs,X_k,X_k_1)
 
  #       SIMD_sparse_matrix_multiplication(Hn_matrices,Bn_matrices,X_k,X_k_1)
@@ -261,11 +267,15 @@ end
 
 
 #TODO: could generalize to take a contraction function to unify all graduated assignment routines
-function HOM_graduated_assignment(marg_tensor::SparseMatrixCSC{Float64,Int64},max_iterations::Int=12,tol::Float64=1e-4)
-
+function HOM_graduated_assignment(marg_tensor::SparseMatrixCSC{Float64,Int64},m::Int=-1,max_iterations::Int=12,tol::Float64=1e-4)
+    println(m)
+    println(max_iterations)
     #    X_k = np.ones((n,m))
     n = size(marg_tensor,1)
-    m = Int(sqrt(n))
+    if m == -1
+        m = Int(sqrt(n))
+    end
+    #m = Int(sqrt(n))
     x_k::Array{Float64,1} = rand(Float64,n)
     x_k ./= norm(x_k)
     beta = 30 # constant from the paper
@@ -282,7 +292,7 @@ function HOM_graduated_assignment(marg_tensor::SparseMatrixCSC{Float64,Int64},ma
         while true
 
             x_normalized = copy(x_k_1)
-            Bistochastic_Normalization!(x_normalized,10,m,m)
+            Bistochastic_Normalization!(x_normalized,10,Int(n/m),m)
   #          print(f"{norm(X_normalized - X_k_1,'fro')}")
             if norm(x_normalized - x_k_1) < 1e-4
                 x_k_1 = x_normalized

@@ -15,7 +15,7 @@ using ImageFeatures  #used for demos
 include("triangles.jl")
 include("contraction.jl")
 include("GraduatedAssignment.jl")
-#include("Experimental_code.jl")
+include("Experimental_code.jl")
 include("HOFASM_impl.jl")
 include("HOM.jl")
 include("experiments.jl")
