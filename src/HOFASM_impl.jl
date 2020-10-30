@@ -12,13 +12,19 @@
 -----------------------------------------------------------------------------=#
 
 
-
 """-----------------------------------------------------------------------------
-    Runs a full synthetic correspondence problem alignment random points to
-  perturbed points with std dev σ. Algorithm can be run with 3 different modes,
-  which determine how the contractions are computed at each iteration of the
-  graduated assignment routine, using the original specifications, or our sped
-  up routines which utilize the kronecker mixed product property.
+  This function runs the HOFASM algorithm [1] on an instance of a synthetic 
+  experiments in Park et al.[1] which used framework in [2]. The routine takes 
+  in a number of points n, and builds source and target points using
+
+                          t_i = scale*(s_i + σ*randn(d)), 
+                   
+  where s\\_i is the ith d=2 dimensional random normal generated. The targer 
+  points are then randomly shuffled and the HOFASM procedure is run. HOFASM
+  can be run with 3 different modes, which determine how the contractions are 
+  computed at each iteration of the graduated assignment routine, using 
+  explicit_marginalization, implicit marginalization, or our routines which 
+  utilize our tensor Kronecker product theory.
 
   Inputs:
   -------
@@ -26,17 +32,24 @@
     The number of points to use in the correspondence problem
   * sigma - (Float64):
     The standard deviation of the pertubation applied to the source points
+  * outliers - (Int):
+      Additional random normal points to add into the correspondence problem.
+      Generated are normal points centered at the origin with covariance = I.
+      Default is 0.
+  * scale - (Float):
+      Desired scaling to the correspondence problem. 
   * method - (optional String):
     a string indicating which method to use in the contraction phase of the
     algorithm.
     options:
-        * - "new": Uses our new methods which use the mixed product property
+        + - "new": Uses our new methods which use the mixed product property
                    to improve the runtime. This is the default option.
-        * - "orig": Uses a list of explicitly built marginalized tensors
+        + - "explicitMarg": Uses a list of explicitly built marginalized tensors
                     corresponding to each Hn ⊗ Bn pair
-        * - "orig2": Uses the original list of tensor indices, and implicitly
-                     marginalizes at each contraction phase.
-
+        + - "implicitMarg": Uses the original list of tensor indices, and 
+                    implicitly marginalizes at each contraction phase.
+  * seed - (Any):
+    Any desired seed, other experiment drivers use UInts. 
   Outputs:
   --------
   * X - (Array{Float64,2}):
@@ -46,6 +59,17 @@
     when this step is unused.
   * iteration_time - (Float64):
     The run time of the graduated assignment step.
+
+  Citations
+  ---------
+  [1] - S. Park, S.-K. Park, and M. Herbert, "Fast and scalable approximate 
+        spectral matching for higher order grpah matching," IEEE transactions
+        on pattern analysis and machine intelligence, vol. 36, no. 3, 
+        pp. 479-492,2013.
+  [2] - R. Zass and A. Shashua, "Probabalistic Graph and Hypergraph Matching" 
+        in 2008 IEEE Conference on Computer Vision and Pattern Recognition.
+        IEEE, 2008, pp. 1-8.
+
 -----------------------------------------------------------------------------"""
 function synthetic_HOFASM(n::Int,sigma::Float64,outliers::Int=0,scale::Float64=1.0;method="new",seed=nothing)
 
@@ -96,18 +120,19 @@ function synthetic_HOFASM(n::Int,sigma::Float64,outliers::Int=0,scale::Float64=1
 
         #return marg_ten_pairs
         x, iteration_time = @timed HOFASM_iterations(marg_ten_pairs,n,m)
-    elseif method == "orig" #explicit marginalization
+    elseif method == "explicitMarg" #explicit marginalization
         marginalized_tensors,kron_time =
           @timed [perm_marginalize(Hn_ind,Bn_ind,Bn_val,n,m) for (Bn_ind,Bn_val,Hn_ind)
         in zip(bases_tensor_indices,bases_tensor_vals,index_tensor_indices)]
 
         x, iteration_time = @timed HOFASM_iterations(marginalized_tensors,n,m)
 
-    elseif method =="orig2" # implicit marginalization
+    elseif method =="implicitMarg" # implicit marginalization
         kron_time = 0.0
         x, iteration_time = @timed HOFASM_iterations(bases_tensor_indices,
                                                      bases_tensor_vals,index_tensor_indices,n,m)
     elseif method == "SSoEfHOM"
+        # Warning: experimental code!
         marg_ten_pairs, kron_time =
             @timed Make_HOFASM_tensor_pairs(index_tensor_indices,bases_tensor_indices,
                                             bases_tensor_vals,n,m)
@@ -160,7 +185,6 @@ function build_list_of_approx_tensors(triangles::Array{Tuple{Tuple{Int,Int,Int},
       Dictionary linking approximate angles to the list of indices associated
       with the triangles approximated by each approximate angles.
     -------------------------------------------------------------------------"""
-    #could probably improve performance using 3 tuples
     Tensors = Dict{Array{F,1},Array{Tuple{Int,Int,Int},1}}()
 
     if avg_bins

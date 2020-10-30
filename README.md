@@ -1,7 +1,7 @@
 HOFASM.jl
 =====
 
-julia (v1.3) implementations for the [HOFASM](https://www.ri.cmu.edu/pub_files/2014/3/Manuscript_Soonyong.pdf) and [HOM](https://ieeexplore.ieee.org/document/5432196) point correspondence algorithms. our HOFASM implementation makes use of the mixed contraction property of the tensor Kronecker product in the marginalization scheme to produce a 10x runtime improvement. 
+julia implementations for the [HOFASM](https://www.ri.cmu.edu/pub_files/2014/3/Manuscript_Soonyong.pdf) and [HOM](https://ieeexplore.ieee.org/document/5432196) point correspondence algorithms. our HOFASM implementation makes use of the mixed contraction property of the tensor Kronecker product in the marginalization scheme to produce a 10x runtime improvement. 
 
 
 Contents

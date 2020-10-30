@@ -1,4 +1,10 @@
-
+"""-----------------------------------------------------------------------------
+  This routine is the example in ImageFeatures.jl modified to use the HOFASM 
+  method and diplay the matchings between the points. This method is primarily 
+  included to provide a template for a visual interface for future 
+  experimentation. 
+  
+-----------------------------------------------------------------------------"""
 function align_photos(img_1,img_2)
 
     img1 = load(img_1)
@@ -44,7 +50,12 @@ function align_photos(img_1,img_2)
     return grid
 end
 
+"""-----------------------------------------------------------------------------
+  This is a routine works to run the HOFASM alignment method on a pair of source
+  and target embeddings. This method is primarily included to facilitate 
+  additional experimentation. 
 
+-----------------------------------------------------------------------------"""
 function align_embeddings(source::Array{Float64,2},target::Array{Float64,2};method="HOFASM")
 
     n = size(source,1)
@@ -76,8 +87,30 @@ function align_embeddings(source::Array{Float64,2},target::Array{Float64,2};meth
     return x, build_assignment(x,use_colsort=true)
 end
 
+"""-----------------------------------------------------------------------------
+  Serialized timing experiments for the HOFASM and HOM methods. Experiments vary
+  over different sizes of graphs with a fixed noise level (sigma = 1). 
 
-function timing_experiments(average_over = 100,seed=false;method="HOFASM",sub_method="new")
+  Inputs
+  ------
+  * trials - (Int):
+     How many trials to run. Extra trial is added and skipped to account
+     for compile time. 
+  * seed - (Bool):
+     Whether or not to seed the experiments. Seeds are generated seeding Random.jl
+     with 0, and generating as many seeds as there are experiments.
+     seeds. 
+  * method - (String):
+     Whether to run 'HOFASM' or 'HOM' for the experiment. sub_method is passed to 
+     the synthetic_HOFASM to determine which type of marginalization to use. 
+  
+  Outputs
+  -------
+  * Experiments - (Dict{Int,Array{1,Floats}}):
+    A dictionary linking each of the experiment's n value linked to the runtimes
+    of the trials run. 
+-----------------------------------------------------------------------------"""
+function timing_experiments(trials = 100,seed=false;method="HOFASM",sub_method="new")
  #   kron_formation_times = []
     run_times = []
     n_values = [10,20,30,40,60,80,100]
@@ -86,7 +119,7 @@ function timing_experiments(average_over = 100,seed=false;method="HOFASM",sub_me
 
     if seed
         Random.seed!(0)
-        seeds = rand(UInt64, length(n_values), average_over+1)
+        seeds = rand(UInt64, length(n_values), trials+1)
     end
 
     n_exp_j = 1
@@ -96,7 +129,7 @@ function timing_experiments(average_over = 100,seed=false;method="HOFASM",sub_me
         runtime_results = []
 #        kron_time = 0.0
         run_time = 0.0
-        for i in 1:average_over+1
+        for i in 1:trials+1
             if method == "HOFASM"
                 _ , kt, rt, _ = synthetic_HOFASM(n,sigma,method=sub_method,seed = seeds[n_exp_j,i])
             elseif method == "HOM"
@@ -108,21 +141,47 @@ function timing_experiments(average_over = 100,seed=false;method="HOFASM",sub_me
                 continue #skip due to compile time
             end
             push!(runtime_results,rt+kt)
- #           kron_time += kt
+
         end
         Experiments[n] = runtime_results
              n_exp_j += 1
- #       push!(kron_formation_times,kron_time/average_over)
-      #  push!(run_times,run_time/average_over)
 
         println("finished problem size $n")
     end
 
-#    kron_formation_times,
     return Experiments
 end
 
-function distributed_timing_experiments(nprocs::Int,average_over = 100,seed=false;method="HOFASM",sub_method="new")
+
+"""-----------------------------------------------------------------------------
+  This function runs timing experiments using the Distributed.jl package. 
+  Experiments vary over different sizes of graphs with a fixed noise 
+  level (sigma = 1).
+
+Inputs
+------
+* nprocs - (Int):
+   How many processes have been allocated.
+* trials - (Int):
+   How many trials to run. Extra trial is added and skipped to account
+   for compile time. 
+* seed - (Bool):
+   Whether or not to seed the experiments. Seeds are generated seeding Random.jl
+   with 0, and generating as many seeds as there are experiments. Lists of seeds
+   for each processer are generated, so the number of processes may affect final 
+   seeds. 
+* method - (String):
+   Whether to run 'HOFASM' or 'HOM' for the experiment. sub_method is passed to 
+   the synthetic_HOFASM to determine which type of marginalization to use. 
+
+Outputs
+-------
+* Experiments - (Dict{Int,Array{1,Floats}}):
+  A dictionary linking each of the experiment's n value linked to the runtimes
+  of the trials run. 
+
+-----------------------------------------------------------------------------"""
+function distributed_timing_experiments(nprocs::Int,trials = 100,seed=false;method="HOFASM",sub_method="new")
 
     @assert average_over % nprocs == 0 #must divide for simplicitly
 
@@ -131,7 +190,7 @@ function distributed_timing_experiments(nprocs::Int,average_over = 100,seed=fals
 
     n_values = [10,20,30,40,60,80,100]
 
-    trials_per_process = Int(average_over/nprocs)
+    trials_per_process = Int(trials/nprocs)
 
     if seed
         Random.seed!(0)
@@ -142,7 +201,9 @@ function distributed_timing_experiments(nprocs::Int,average_over = 100,seed=fals
     Experiments = Dict()
     sigma = 1.0
 
-
+    #
+    #  trials computed on each process
+    #
     function sub_tests(trials,n,sigma,method,sub_method;seeds::Array{UInt,1}=nothing)
 
         if seeds !== nothing
@@ -196,7 +257,31 @@ function distributed_timing_experiments(nprocs::Int,average_over = 100,seed=fals
     return Experiments
 end
 
-function accuracy_experiments(average_over::Int = 2,seed=false;method="HOFASM",sub_method="new")
+"""-----------------------------------------------------------------------------
+  Serialized accuracy experiments for the HOFASM and HOM methods. Experiments 
+  vary over different noise levels (sigma) with a fixed noise level (n = 30).
+   
+Inputs
+------
+* trials - (Int):
+   How many trials to average over. 
+* seed - (Bool):
+   Whether or not to seed the experiments. Seeds are generated seeding Random.jl
+   with 0, and generating as many seeds as there are experiments. Lists of seeds
+   for each processer are generated, so the number of processes may affect final 
+   seeds. 
+* method - (String):
+   Whether to run 'HOFASM' or 'HOM' for the experiment. sub_method is passed to 
+   the synthetic_HOFASM to determine which type of marginalization to use. 
+
+Outputs
+-------
+* Experiments - (Dict{Int,Array{1,Floats}}):
+  A dictionary linking each of the experiment's sigma value linked to the 
+  runtimes of the trials run. 
+
+-----------------------------------------------------------------------------"""
+function accuracy_experiments(trials::Int = 2,seed=false;method="HOFASM",sub_method="new")
 
     sigmas = [.025,.05,.0725,.1,.125,.15,.175,.2]
 
@@ -206,7 +291,7 @@ function accuracy_experiments(average_over::Int = 2,seed=false;method="HOFASM",s
 
     if seed
         Random.seed!(0)
-        seeds = rand(UInt64,length(sigmas), average_over)
+        seeds = rand(UInt64,length(sigmas), trials)
     else
         exp_seed = nothing
     end
@@ -215,9 +300,8 @@ function accuracy_experiments(average_over::Int = 2,seed=false;method="HOFASM",s
     for sigma in sigmas
 
         colsort_accuracies = []
-#        kron_time = 0.0
 
-        for i in 1:average_over
+        for i in 1:trials
             if seed
                 exp_seed = seeds[sigma_exp_j,i]
             end
@@ -227,7 +311,7 @@ function accuracy_experiments(average_over::Int = 2,seed=false;method="HOFASM",s
             elseif method == "HOM"
                 X,_, p  = synthetic_HOM(n,sigmal;seed=seeds[sigma_exp_j,i])
             end
-            #transpose is need to maintain row major format
+
             assignment = build_assignment(X,use_colsort=true)
 
             colsort_accuracy = sum([1.0 for (i,j) in assignment if p[i] == j])/n
@@ -242,6 +326,34 @@ function accuracy_experiments(average_over::Int = 2,seed=false;method="HOFASM",s
     return Experiments
 end
 
+"""-----------------------------------------------------------------------------
+  This function runs timing experiments using the Distributed.jl package. 
+  Experiments vary over different noise levels (sigma) with a fixed noise level 
+  (n = 30).
+
+Inputs
+------
+* nprocs - (Int):
+   How many processes have been allocated.
+* trials - (Int):
+   How many trials to run. Extra trial is added and skipped to account
+   for compile time. 
+* seed - (Bool):
+   Whether or not to seed the experiments. Seeds are generated seeding Random.jl
+   with 0, and generating as many seeds as there are experiments. Lists of seeds
+   for each processer are generated, so the number of processes may affect final 
+   seeds. 
+* method - (String):
+   Whether to run 'HOFASM' or 'HOM' for the experiment. sub_method is passed to 
+   the synthetic_HOFASM to determine which type of marginalization to use. 
+
+Outputs
+-------
+* Experiments - (Dict{Int,Array{1,Floats}}):
+  A dictionary linking each of the experiment's n value linked to the runtimes
+  of the trials run. 
+
+-----------------------------------------------------------------------------"""
 function distributed_accuracy_experiments(average_over::Int = 2,seed=false;method="HOFASM",sub_method="new")
 
     @everywhere include_string(Main,$(read("HOFASM.jl",String)),"HOFASM.jl")
