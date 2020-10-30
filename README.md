@@ -25,6 +25,7 @@ Contents
    Non-essential code used for additional experimentation.
  * test_code.jl:
    Basic testing code for comparing the different contraction methods and the HOFASM and HOM methods. Not implemented as standard Julia unit tests, code must be run manually.  
+
 Dependencies
 ===========
 [LinearAlgebra](https://docs.julialang.org/en/v1/stdlib/LinearAlgebra/), [SparseArrays](https://docs.julialang.org/en/v1/stdlib/SparseArrays/), and [Arpack](https://github.com/JuliaLinearAlgebra/Arpack.jl) for any sparse numerical linear algebra routines needed, coupled with [Combinatorics](https://github.com/JuliaMath/Combinatorics.jl) for implicit transpose operations. 
