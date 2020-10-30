@@ -3,7 +3,7 @@
   method and diplay the matchings between the points. This method is primarily 
   included to provide a template for a visual interface for future 
   experimentation. 
-  
+
 -----------------------------------------------------------------------------"""
 function align_photos(img_1,img_2)
 
@@ -333,8 +333,6 @@ end
 
 Inputs
 ------
-* nprocs - (Int):
-   How many processes have been allocated.
 * trials - (Int):
    How many trials to run. Extra trial is added and skipped to account
    for compile time. 
@@ -354,7 +352,7 @@ Outputs
   of the trials run. 
 
 -----------------------------------------------------------------------------"""
-function distributed_accuracy_experiments(average_over::Int = 2,seed=false;method="HOFASM",sub_method="new")
+function distributed_accuracy_experiments(average_over::Int = 2,seed::Bool=false;method="HOFASM",sub_method="new")
 
     @everywhere include_string(Main,$(read("HOFASM.jl",String)),"HOFASM.jl")
     sigmas = [.025,.05,.0725,.1,.125,.15,.175,.2]

@@ -48,7 +48,7 @@ function build_list_of_approx_tensors_test(triangles::Array{Tuple{Tuple{Int,Int,
                 if haskey(bin_averages,approx_angles)
                     bin_averages[approx_angles] += [angles[1],angles[2],angles[3]]
                 else
-                    bin_averages[approx_angles] = [angles[perm[1]],angles[perm[2]],angles[perm[3]]]
+                    bin_averages[approx_angles] = [angles[1],angles[2],angles[3]]
                 end
             end
 

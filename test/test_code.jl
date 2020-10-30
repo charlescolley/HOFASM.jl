@@ -1,5 +1,8 @@
 
 using PyCall
+using LinearAlgebra
+using SparseArrays
+using Combinatorics:permutations
 #special testing
 numpy = pyimport("numpy")
 function numpy_kron(A,B)
@@ -13,16 +16,16 @@ ERROR_TOL = 1e-13
 function test_code()
     n = 10
     m = 10
-    source = brute_force_triangles(rand(n,2))
+    source = HOFASM.brute_force_triangles(rand(n,2))
     source[2] = (source[2][1],source[1][2]) #make a duplicate angle
-    target = brute_force_triangles(rand(m,2))
+    target = HOFASM.brute_force_triangles(rand(m,2))
 
     H_indices, H_vals,B_indices,B_vals =
-        build_index_and_bases_tensors(source, target, 5.0,test_mode=true)
+        HOFASM.build_index_and_bases_tensors(source, target, 5.0,test_mode=true)
     HOFASM_perm_marg_ten = HOFASM_mode1_marg(H_indices,B_indices,B_vals,m,n)
 
-    HOM_indices, HOM_vals = produce_HOM_tensor(source,target,m,tol=1e-16,test_mode=true)
-    HOM_marg_ten = Matrix(sym_mode1_marginalization(HOM_indices,HOM_vals,n*m))
+    HOM_indices, HOM_vals = HOFASM.produce_HOM_tensor(source,target,m,tol=1e-16,test_mode=true)
+    HOM_marg_ten = Matrix(HOFASM.sym_mode1_marginalization(HOM_indices,HOM_vals,n*m))
 
     #symmetry check
     @assert norm(HOM_marg_ten - HOM_marg_ten')/norm(HOM_marg_ten) < ERROR_TOL
@@ -39,12 +42,12 @@ end
 function test_contraction(n::Int=30,m::Int=30,bin_size::Float64=5.0)
 
 
-    source = brute_force_triangles(rand(n,2))
-    target = brute_force_triangles(rand(m,2))
+    source = HOFASM.brute_force_triangles(rand(n,2))
+    target = HOFASM.brute_force_triangles(rand(m,2))
 
 
-    H_indices, H_vals,B_indices,B_vals = build_index_and_bases_tensors(source, target, bin_size)
-    pairs,pair_timing = @timed Make_HOFASM_tensor_pairs(H_indices,B_indices,B_vals,m,n)
+    H_indices, H_vals,B_indices,B_vals = HOFASM.build_index_and_bases_tensors(source, target, bin_size)
+    pairs,pair_timing = @timed HOFASM.Make_HOFASM_tensor_pairs(H_indices,B_indices,B_vals,m,n)
 
     println("built $(length(pairs)) pairs")
 
@@ -53,7 +56,7 @@ function test_contraction(n::Int=30,m::Int=30,bin_size::Float64=5.0)
     X = Matrix(reshape(x,m,n)') #julia defaults to col major formatting
     Y1 = rand(n,m)
 
-    t1 = @timed HOFASM_contraction!(pairs,X,Y1)
+    t1 = @timed HOFASM.HOFASM_contraction!(pairs,X,Y1)
     println("HOFASM_contraction runtimes;
             pre-processing: $(pair_timing[1])    contraction op:$(t1[2])")
 
@@ -62,23 +65,23 @@ function test_contraction(n::Int=30,m::Int=30,bin_size::Float64=5.0)
     preprocessed_pairs,processing_time = @timed [(findnz(H)...,B) for (H,B) in pairs]
     #preprocessed_pairs = [(findnz(H)...,B) for (H,B) in pairs]
     #return preprocessed_pairs,X,Y
-    t2 = @timed HOFASM_contraction!(preprocessed_pairs,X,Y2)
+    t2 = @timed HOFASM.HOFASM_contraction!(preprocessed_pairs,X,Y2)
     println("preprocessed HOFASM_contraction runtimes;
              pre-processing:$(processing_time[1]+pair_timing[1]) contraction op:$(t2[2])  ")
 
     #-----------------------------implicit marginalization-------------------------------------#
     implicit_marg_kron_y = rand(n*m)
-    t3 = @timed implicit_kronecker_model_marginalization_contraction!(B_indices,B_vals,H_indices,
+    t3 = @timed HOFASM.implicit_kronecker_model_marginalization_contraction!(B_indices,B_vals,H_indices,
                                                                       x,implicit_marg_kron_y,n,m)
     println("explicit marg kron HOFASM_contraction runtimes;
              contraction op:$(t3[2])")
 
     #-----------------------------explicit marginalization-------------------------------------#
 
-    kron_pairs, kron_times = @timed [perm_marginalize(Hn_ind,Bn_ind,Bn_val,n,m) for (Bn_ind,Bn_val,Hn_ind) in zip(B_indices,B_vals,H_indices)]
+    kron_pairs, kron_times = @timed [HOFASM.perm_marginalize(Hn_ind,Bn_ind,Bn_val,n,m) for (Bn_ind,Bn_val,Hn_ind) in zip(B_indices,B_vals,H_indices)]
     explicit_marg_kron_y = rand(n*m)
 
-    t4 = @timed HOFASM_contraction!(kron_pairs,x,explicit_marg_kron_y)
+    t4 = @timed HOFASM.HOFASM_contraction!(kron_pairs,x,explicit_marg_kron_y)
     println("explicit marg kron HOFASM_contraction runtimes;
              pre-processing:$(kron_times[1]) contraction op:$(t4[2])  ")
 
@@ -137,8 +140,8 @@ function HOFASM_mode1_marg(H_indices::Array{Array{Int64,2},1},B_indices::Array{A
                             B_vals::Array{Array{Float64,1},1},m::Int,n::Int)
 
         return sum([sum(
-                [numpy_kron(perm_mode1_marginalization(H_idx,ones(size(H_idx,1)),p,n),
-                            perm_mode1_marginalization(B_idx,v,p,m)
+                [numpy_kron(HOFASM.perm_mode1_marginalization(H_idx,ones(size(H_idx,1)),p,n),
+                            HOFASM.perm_mode1_marginalization(B_idx,v,p,m)
                             )
                             for p in permutations((1,2,3))
                 ]) for (H_idx,B_idx,v) in zip(H_indices,B_indices,B_vals)])
