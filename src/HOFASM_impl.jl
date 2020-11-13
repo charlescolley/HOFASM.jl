@@ -44,9 +44,9 @@
     options:
         + - "new": Uses our new methods which use the mixed product property
                    to improve the runtime. This is the default option.
-        + - "explicitMarg": Uses a list of explicitly built marginalized tensors
+        + - "partiallyImplicit": Uses a list of explicitly built marginalized tensors
                     corresponding to each Hn ⊗ Bn pair
-        + - "implicitMarg": Uses the original list of tensor indices, and 
+        + - "fullyImplicit": Uses the original list of tensor indices, and 
                     implicitly marginalizes at each contraction phase.
   * seed - (Any):
     Any desired seed, other experiment drivers use UInts. 
@@ -120,14 +120,14 @@ function synthetic_HOFASM(n::Int,sigma::Float64,outliers::Int=0,scale::Float64=1
         =#
         #return marg_ten_pairs
         x, iteration_time = @timed HOFASM_iterations(marg_ten_pairs,n,m)
-    elseif method == "explicitMarg" #explicit marginalization
+    elseif method == "partiallyImplicit" 
         marginalized_tensors,kron_time =
           @timed [perm_marginalize(Hn_ind,Bn_ind,Bn_val,n,m) for (Bn_ind,Bn_val,Hn_ind)
         in zip(bases_tensor_indices,bases_tensor_vals,index_tensor_indices)]
 
         x, iteration_time = @timed HOFASM_iterations(marginalized_tensors,n,m)
 
-    elseif method =="implicitMarg" # implicit marginalization
+    elseif method =="fullyImplicit" 
         kron_time = 0.0
         x, iteration_time = @timed HOFASM_iterations(bases_tensor_indices,
                                                      bases_tensor_vals,index_tensor_indices,n,m)
@@ -140,7 +140,7 @@ function synthetic_HOFASM(n::Int,sigma::Float64,outliers::Int=0,scale::Float64=1
         x, iteration_time = @timed SSoEfHOM(marg_ten_pairs,n,m)
 
     else
-        throw(ArgumentError("valid method: must be 'new', 'orig', or 'orig2'"))
+        throw(ArgumentError("valid method: must be 'new', 'partiallyImplicit', or 'fullyImplicit'"))
     end
 
     return reshape(x,n,m), kron_time, iteration_time, p
